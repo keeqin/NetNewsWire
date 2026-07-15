@@ -7,6 +7,7 @@
 //
 
 import AppKit
+import SwiftUI
 
 private struct PreferencesToolbarItemSpec {
 
@@ -25,6 +26,7 @@ private struct ToolbarItemIdentifier {
 	static let General = "General"
 	static let Accounts = "Accounts"
 	static let Advanced = "Advanced"
+	static let ChatGPT = "ChatGPT"
 }
 
 final class PreferencesWindowController: NSWindowController, NSToolbarDelegate {
@@ -42,6 +44,9 @@ final class PreferencesWindowController: NSWindowController, NSToolbarDelegate {
 		specs += [PreferencesToolbarItemSpec(identifierRawValue: ToolbarItemIdentifier.Advanced,
 											 name: NSLocalizedString("Advanced", comment: "Preferences"),
 											 image: Assets.Images.preferencesToolbarAdvanced)]
+		specs += [PreferencesToolbarItemSpec(identifierRawValue: ToolbarItemIdentifier.ChatGPT,
+											 name: "ChatGPT",
+											 image: NSImage(systemSymbolName: "sparkles", accessibilityDescription: "ChatGPT"))]
 		return specs
 	}()
 
@@ -150,6 +155,13 @@ private extension PreferencesWindowController {
 	func viewController(identifier: String) -> NSViewController? {
 		if let cachedViewController = viewControllers[identifier] {
 			return cachedViewController
+		}
+
+		if identifier == ToolbarItemIdentifier.ChatGPT {
+			let controller = NSHostingController(rootView: CodexBridgePreferencesView())
+			controller.view.frame = NSRect(x: 0, y: 0, width: windowWidth, height: 390)
+			viewControllers[identifier] = controller
+			return controller
 		}
 
 		let storyboard = NSStoryboard(name: NSStoryboard.Name("Preferences"), bundle: nil)

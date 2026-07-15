@@ -9,6 +9,7 @@
 import UIKit
 import os
 import SafariServices
+import SwiftUI
 import WebKit
 import RSCore
 import Account
@@ -31,6 +32,12 @@ final class ArticleViewController: UIViewController {
 	@IBOutlet private var searchBar: ArticleSearchBar!
 	@IBOutlet private var searchBarBottomConstraint: NSLayoutConstraint!
 	private var defaultControls: [UIBarButtonItem]?
+	private lazy var chatGPTBarButtonItem = UIBarButtonItem(
+		image: UIImage(systemName: "sparkles"),
+		style: .plain,
+		target: self,
+		action: #selector(analyzeWithChatGPT)
+	)
 
 	private var pageViewController: UIPageViewController!
 	private var isPageTransitionInProgress = false
@@ -122,6 +129,8 @@ final class ArticleViewController: UIViewController {
 		navigationItem.standardAppearance = appearance
 		navigationItem.scrollEdgeAppearance = appearance
 		navigationItem.compactAppearance = appearance
+		chatGPTBarButtonItem.accessibilityLabel = "使用 ChatGPT 解读新闻"
+		navigationItem.rightBarButtonItem = chatGPTBarButtonItem
 
 		let fullScreenTapZone = UIView()
 		NSLayoutConstraint.activate([
@@ -254,6 +263,7 @@ final class ArticleViewController: UIViewController {
 			readBarButtonItem.isEnabled = false
 			starBarButtonItem.isEnabled = false
 			actionBarButtonItem.isEnabled = false
+			chatGPTBarButtonItem.isEnabled = false
 			return
 		}
 
@@ -262,6 +272,7 @@ final class ArticleViewController: UIViewController {
 		nextArticleBarButtonItem.isEnabled = coordinator.isNextArticleAvailable
 		readBarButtonItem.isEnabled = true
 		starBarButtonItem.isEnabled = true
+		chatGPTBarButtonItem.isEnabled = true
 
 		let permalinkPresent = article.preferredLink != nil
 		articleExtractorButton.isEnabled = permalinkPresent && !AppDefaults.shared.isDeveloperBuild
@@ -351,6 +362,40 @@ final class ArticleViewController: UIViewController {
 
 	@IBAction func showActivityDialog(_ sender: Any) {
 		currentWebViewController?.showActivityDialog(popOverBarButtonItem: actionBarButtonItem)
+	}
+
+	@objc private func analyzeWithChatGPT() {
+		guard let article else {
+			return
+		}
+
+		do {
+			let configuration = try CodexBridgeConfigurationStore.loadConfiguration()
+			presentChatGPTAnalysis(article: article, configuration: configuration)
+		} catch {
+			presentChatGPTSettings(article: article)
+		}
+	}
+
+	private func presentChatGPTSettings(article: Article) {
+		let settingsView = CodexBridgeSettingsView { [weak self] configuration in
+			guard let self else {
+				return
+			}
+			self.dismiss(animated: true) {
+				self.presentChatGPTAnalysis(article: article, configuration: configuration)
+			}
+		}
+		let controller = UIHostingController(rootView: settingsView)
+		controller.modalPresentationStyle = .formSheet
+		present(controller, animated: true)
+	}
+
+	private func presentChatGPTAnalysis(article: Article, configuration: CodexBridgeConfiguration) {
+		let analysisController = ChatGPTArticleAnalysisViewController(article: article, configuration: configuration)
+		let navigationController = UINavigationController(rootViewController: analysisController)
+		navigationController.modalPresentationStyle = .pageSheet
+		present(navigationController, animated: true)
 	}
 
 	@objc func toggleReaderView(_ sender: Any?) {

@@ -66,6 +66,8 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>用于连接您 Mac 上运行的 CodexBridge。</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Grant permission to save images from the article.</string>
 	<key>NSUserActivityTypes</key>

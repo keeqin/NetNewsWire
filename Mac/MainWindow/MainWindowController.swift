@@ -8,6 +8,7 @@
 
 import AppKit
 import os
+import SwiftUI
 import UserNotifications
 import Articles
 import Account
@@ -15,6 +16,10 @@ import RSCore
 
 enum TimelineSourceMode {
 	case regular, search
+}
+
+private final class WeakChatGPTViewControllerBox {
+	weak var value: NSViewController?
 }
 
 final class MainWindowController: NSWindowController, NSUserInterfaceValidations {
@@ -75,6 +80,10 @@ final class MainWindowController: NSWindowController, NSUserInterfaceValidations
 		toolbar.displayMode = .iconOnly
 		toolbar.delegate = self
 		self.window?.toolbar = toolbar
+		if !toolbar.items.contains(where: { $0.itemIdentifier == .chatGPT }) {
+			let insertionIndex = toolbar.items.firstIndex(where: { $0.itemIdentifier == .share }) ?? toolbar.items.count
+			toolbar.insertItem(withItemIdentifier: .chatGPT, at: insertionIndex)
+		}
 
 		if let window = window {
 			let point = NSPoint(x: 128, y: 64)
@@ -278,6 +287,10 @@ final class MainWindowController: NSWindowController, NSUserInterfaceValidations
 			return canShowShareMenu()
 		}
 
+		if item.action == #selector(analyzeWithChatGPT(_:)) {
+			return oneSelectedArticle != nil
+		}
+
 		if item.action == #selector(moveFocusToSearchField(_:)) {
 			return currentSearchField != nil
 		}
@@ -379,6 +392,19 @@ final class MainWindowController: NSWindowController, NSUserInterfaceValidations
 		}
 		if let link = currentLink {
 			Browser.open(link, inBackground: !AppDefaults.shared.openInBrowserInBackground)
+		}
+	}
+
+	@objc func analyzeWithChatGPT(_ sender: Any?) {
+		guard let article = oneSelectedArticle else {
+			return
+		}
+
+		do {
+			let configuration = try CodexBridgeConfigurationStore.loadConfiguration()
+			presentChatGPTAnalysis(article: article, configuration: configuration)
+		} catch {
+			presentChatGPTConfiguration(for: article)
 		}
 	}
 
@@ -798,6 +824,7 @@ extension NSToolbarItem.Identifier {
 	static let openInBrowser = NSToolbarItem.Identifier("openInBrowser")
 	static let share = NSToolbarItem.Identifier("share")
 	static let articleThemeMenu = NSToolbarItem.Identifier("articleThemeMenu")
+	static let chatGPT = NSToolbarItem.Identifier("chatGPT")
 	static let cleanUp = NSToolbarItem.Identifier("cleanUp")
 }
 
@@ -869,6 +896,11 @@ extension MainWindowController: NSToolbarDelegate {
 			articleThemeMenuToolbarItem.label = description
 			return articleThemeMenuToolbarItem
 
+		case .chatGPT:
+			let title = "ChatGPT 解读"
+			let image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: title) ?? NSImage(size: NSSize(width: 18, height: 18))
+			return buildToolbarButton(.chatGPT, title, image, "analyzeWithChatGPT:")
+
 		case .search:
 			let toolbarItem = NSSearchToolbarItem(itemIdentifier: .search)
 			let description = NSLocalizedString("Search", comment: "Search")
@@ -904,6 +936,7 @@ extension MainWindowController: NSToolbarDelegate {
 			.openInBrowser,
 			.share,
 			.articleThemeMenu,
+			.chatGPT,
 			.search,
 			.cleanUp
 		]
@@ -923,6 +956,7 @@ extension MainWindowController: NSToolbarDelegate {
 			.markStar,
 			.nextUnread,
 			.readerView,
+			.chatGPT,
 			.share,
 			.openInBrowser,
 			.flexibleSpace,
@@ -965,6 +999,49 @@ extension MainWindowController: NSToolbarDelegate {
 // MARK: - Private
 
 private extension MainWindowController {
+
+	func presentChatGPTConfiguration(for article: Article) {
+		let controllerBox = WeakChatGPTViewControllerBox()
+		let view = CodexBridgePreferencesView(
+			onSave: { [weak self] configuration in
+				guard let self, let hostingController = controllerBox.value else {
+					return
+				}
+				self.dismissChatGPTSheet(hostingController) { [weak self] in
+					self?.presentChatGPTAnalysis(article: article, configuration: configuration)
+				}
+			},
+			onCancel: { [weak self] in
+				guard let self, let hostingController = controllerBox.value else {
+					return
+				}
+				self.dismissChatGPTSheet(hostingController)
+			}
+		)
+		let hostingController = NSHostingController(rootView: AnyView(view))
+		controllerBox.value = hostingController
+		contentViewController?.presentAsSheet(hostingController)
+	}
+
+	func presentChatGPTAnalysis(article: Article, configuration: CodexBridgeConfiguration) {
+		let controllerBox = WeakChatGPTViewControllerBox()
+		let view = MacChatGPTArticleAnalysisView(article: article, configuration: configuration) { [weak self] in
+			guard let self, let hostingController = controllerBox.value else {
+				return
+			}
+			self.dismissChatGPTSheet(hostingController)
+		}
+		let hostingController = NSHostingController(rootView: AnyView(view))
+		controllerBox.value = hostingController
+		contentViewController?.presentAsSheet(hostingController)
+	}
+
+	func dismissChatGPTSheet(_ controller: NSViewController, completion: (() -> Void)? = nil) {
+		contentViewController?.dismiss(controller)
+		DispatchQueue.main.async {
+			completion?()
+		}
+	}
 
 	var splitViewController: NSSplitViewController? {
 		guard let viewController = contentViewController else {

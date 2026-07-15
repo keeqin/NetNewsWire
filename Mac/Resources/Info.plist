@@ -57,6 +57,8 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>用于连接您 Mac 上运行的 CodexBridge。</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>NetNewsWire communicates with other apps on your Mac when you choose to share an article.</string>
 	<key>NSAppleScriptEnabled</key>

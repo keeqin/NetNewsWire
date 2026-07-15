@@ -24,8 +24,9 @@ final class SettingsViewController: UITableViewController {
 		case timeline = 3
 		case articles = 4
 		case appearance = 5
-		case troubleshooting = 6
-		case help = 7
+		case chatGPT = 6
+		case troubleshooting = 7
+		case help = 8
 	}
 
 	private enum TroubleshootingRow: Int {
@@ -274,6 +275,13 @@ final class SettingsViewController: UITableViewController {
 		case .appearance:
 			let colorPalette = UIStoryboard.settings.instantiateController(ofType: ColorPaletteTableViewController.self)
 			self.navigationController?.pushViewController(colorPalette, animated: true)
+		case .chatGPT:
+			let settingsView = CodexBridgeSettingsView { [weak self] _ in
+				self?.dismiss(animated: true)
+			}
+			let controller = UIHostingController(rootView: settingsView)
+			controller.modalPresentationStyle = .formSheet
+			present(controller, animated: true)
 		case .troubleshooting:
 			let viewController: UIViewController? = {
 				switch TroubleshootingRow(rawValue: indexPath.row) {
